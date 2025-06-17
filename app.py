@@ -1,37 +1,52 @@
-from flask import Flask, request, redirect
+from os import path, makedirs, getcwd
 import sqlite3
 
+from flask import Flask, request, redirect
 
-context = sqlite3.connect("db\\database.db", check_same_thread=False)
-cursor = context.cursor()
 
-with context:
-    context.cursor().execute("""create table if not exists url (id integer,
-                                        url_short varchar(50) not null,
-                                        url_redirect text not null,
+diretorio_atual = getcwd()
+diretorio_db = path.join(diretorio_atual, "db")
+
+if not path.exists(diretorio_db): makedirs(diretorio_db)
+
+
+conexao = sqlite3.connect("db\\database.db", check_same_thread=False)
+cursor = conexao.cursor()
+
+with conexao:
+    conexao.cursor().execute("""create table if not exists url (id integer,
+                                        url_curta varchar(50) not null,
+                                        url_redirecionada text not null,
+                                        visualizacoes integer,
                                         PRIMARY KEY(id AUTOINCREMENT));""")
     
 
-def cadastrar_url(url_short, url_redirect):
+def cadastrar_url(url_curta, url_redirecionada, visualizacoes=0):
 
-    cursor.execute("""INSERT INTO url (url_short, url_redirect) VALUES
-                                (?, ?);""", (url_short, url_redirect))
-    context.commit()
+    cursor.execute("""INSERT INTO url (url_curta, url_redirecionada, visualizacoes)
+                      VALUES (?, ?, ?);""", (url_curta, url_redirecionada, visualizacoes))
+    conexao.commit()
 
 
-def get_url(url_short):
-    cursor.execute("""SELECT url_redirect
-                                FROM url
-                                WHERE url_short = ?;""", (url_short,))
+def get_url(url_curta):
+    cursor.execute("""SELECT url_redirecionada
+                      FROM url
+                      WHERE url_curta = ?;""", (url_curta,))
+    retorno = cursor.fetchone()
+
+    cursor.execute("""UPDATE url
+                      SET visualizacoes = visualizacoes + 1
+                      WHERE url_curta = ?;""", (url_curta,))
+    conexao.commit()
         
-    return cursor.fetchone()
+    return retorno
 
 
 app = Flask(__name__)
 
 
 @app.route("/cadastrar")
-def index():
+def cadastrar_rota():
     received_data = request.get_json()
     cadastrar_url(*received_data.values())
     return "Criado", "201"
