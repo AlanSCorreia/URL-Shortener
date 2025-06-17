@@ -1,4 +1,5 @@
 from os import path, makedirs, getcwd
+import re
 import sqlite3
 
 from flask import Flask, request, redirect
@@ -28,7 +29,7 @@ def cadastrar_url(url_curta, url_redirecionada, visualizacoes=0):
     conexao.commit()
 
 
-def get_url(url_curta):
+def obter_url(url_curta):
     cursor.execute("""SELECT url_redirecionada
                       FROM url
                       WHERE url_curta = ?;""", (url_curta,))
@@ -42,19 +43,33 @@ def get_url(url_curta):
     return retorno
 
 
+def formatar_rota(url: str) -> str:
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    
+    return "https://"+url
+
+
 app = Flask(__name__)
 
 
 @app.route("/cadastrar")
 def cadastrar_rota():
-    received_data = request.get_json()
-    cadastrar_url(*received_data.values())
-    return "Criado", "201"
+    dados_recebidos = request.get_json()
+    regex_url_valida = r'(https?://)?(www.)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(/[^\s]*)?'
+
+    if re.match(regex_url_valida, dados_recebidos["url_redirecionada"]):
+        url_curta = dados_recebidos["url_curta"]
+        url_redirecionada = formatar_rota(dados_recebidos["url_redirecionada"])
+        cadastrar_url(url_curta, url_redirecionada)
+        return "Criado", "201"
+    
+    return "Falha no processo de cadastro", "400"
 
 
-@app.route("/<url_short>")
-def redirecionar_rota(url_short: str):
-    url = get_url(url_short)[0]
+@app.route("/<url_curta>")
+def redirecionar_rota(url_curta: str):
+    url = obter_url(url_curta)[0]
     return redirect(url)
 
 
